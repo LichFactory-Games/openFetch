@@ -20,7 +20,8 @@
     "js/dialog.js",
     "js/itemCreation.js",
     "js/monsterData.js",
-    "js/fetchHelper.js"
+    "js/fetchHelper.js",
+    "js/config.js"
   ],
   "styles": [
     "styles/openFetch.css"
