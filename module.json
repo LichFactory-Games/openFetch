@@ -1,0 +1,28 @@
+{
+  "id": "openFetch",
+  "title": "Open5e Fetch",
+  "version": "0.1",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "12"
+  },
+  "description": "A module to fetch monsters from Open5e",
+  "url": "https://github.com/LichFactory-Games/Open5eFetch",
+  "manifest": "https://raw.githubusercontent.com/LichFactory-Games/Open5eFetch/main/module.json",
+  "download": "https://github.com/LichFactory-Games/Open5eFetch/releases/download/v0.1/",
+  "authors": [
+    {
+      "name": "LichLife"
+    }
+  ],
+  "esmodules": [
+    "js/main.js",
+    "js/dialog.js",
+    "js/itemCreation.js",
+    "js/monsterData.js",
+    "js/fetchHelper.js"
+  ],
+  "styles": [
+    "styles/openFetch.css"
+  ]
+}
