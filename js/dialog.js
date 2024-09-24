@@ -1,4 +1,4 @@
-import { handleSearchInput, handleFetch } from './fetchHelper.js';
+import { handleSearchInput, handleFetch, selectResult } from './fetchHelper.js';
 
 export class MonsterSearchDialog {
   constructor() {
@@ -15,6 +15,7 @@ export class MonsterSearchDialog {
       default: "fetch",
       render: (html) => {
         this.setupEventHandlers();  // Attach event handlers after rendering
+        this.adjustDialogSize();
       },
       close: () => console.log("Dialog closed")
     });
@@ -38,6 +39,17 @@ export class MonsterSearchDialog {
         </div>
       </form>`;
   }
+
+  adjustDialogSize() {
+    const dialogElement = document.querySelector("div.window-app.dialog");
+    if (dialogElement) {
+      dialogElement.style.width = '600px'; // Initial width
+      dialogElement.style.height = 'auto'; // Auto height based on content
+      dialogElement.style.resize = 'both'; // Allow resizing both vertically and horizontally
+      dialogElement.style.overflow = 'auto'; // Add scroll bars if resized smaller than content
+    }
+  }
+
 
   // Method to set up event handlers for the search input
   setupEventHandlers() {
@@ -84,7 +96,7 @@ export class MonsterSearchDialog {
         case 'Enter':
           event.preventDefault();
           if (activeItem) {
-            this.selectResult(activeItem);
+            selectResult(activeItem);
           }
           break;
         }
@@ -94,16 +106,9 @@ export class MonsterSearchDialog {
     }
   }
 
-  // Method to handle the selection of a search result
-  selectResult(activeItem) {
-    const monsterName = activeItem.textContent.trim();
-    document.getElementById('monsterName').value = monsterName;
-    console.log(`Selected Monster: ${monsterName}`);
-    // Additional logic to handle selected monster (e.g., fetch monster data)
-  }
-
   // Handle fetching logic
   handleFetch(html) {
     handleFetch();  // Call the external fetch function
   }
+
 }

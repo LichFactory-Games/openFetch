@@ -16,12 +16,13 @@
     }
   ],
   "esmodules": [
-    "js/main.js",
-    "js/dialog.js",
-    "js/itemCreation.js",
+    "js/config.js",
     "js/monsterData.js",
+    "js/actorCreation.js",
+    "js/itemCreation.js",
     "js/fetchHelper.js",
-    "js/config.js"
+    "js/dialog.js",
+    "js/main.js"
   ],
   "styles": [
     "styles/openFetch.css"
