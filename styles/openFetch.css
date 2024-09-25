@@ -1,7 +1,19 @@
+
+.search-results {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 0.5px solid var(--color-border-light-tertiary);
+    border-radius: 3px;
+    padding: 5px;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.05);
+    min-height: var(--form-field-height);
+    }
+
 .search-results div {
     padding: 5px;
     cursor: pointer;
-}
+    }
 .search-results div:hover {
     background-color: #d2c1ab;
 }
@@ -22,3 +34,20 @@
 .open5e-button:hover {
     background-color: #3c3c3c;
 }
+
+.filter-container {
+  margin-bottom: 15px;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.form-group select {
+  width: 100%;
+    }

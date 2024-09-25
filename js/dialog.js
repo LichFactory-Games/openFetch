@@ -26,18 +26,19 @@ export class MonsterSearchDialog {
   // Method to generate the HTML content of the form
   formHTML() {
     return `
-      <form>
-        <div class="form-group" style="margin-bottom: 10px;">
-            <label for="searchQuery" style="display: block; margin-bottom: 5px;">Search for Monster:</label>
-            <input type="text" name="searchQuery" id="searchQuery" style="width: 100%;">
-        </div>
-        <div id="searchResults" class="search-results" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px;"></div>
-        <div class="form-group">
-            <label for="monsterName" style="display: block; margin-bottom: 5px;">Monster Name:</label>
-            <input type="text" name="monsterName" id="monsterName" readonly style="width: 100%;">
-            <input type="hidden" name="monsterSource" id="monsterSource" readonly>
-        </div>
-      </form>`;
+    <form>
+      <div class="form-group" style="margin-bottom: 10px;">
+        <label for="searchQuery" style="display: block; margin-bottom: 5px;">Search for Monster:</label>
+        <input type="text" name="searchQuery" id="searchQuery" style="width: 100%;">
+      </div>
+      <div id="filterContainer"></div>
+<div id="searchResults" class="search-results"></div>
+      <div class="form-group">
+        <label for="monsterName" style="display: block; margin-bottom: 5px;">Monster Name:</label>
+        <input type="text" name="monsterName" id="monsterName" readonly style="width: 100%;">
+        <input type="hidden" name="monsterSource" id="monsterSource" readonly>
+      </div>
+    </form>`;
   }
 
   adjustDialogSize() {
