@@ -16,7 +16,6 @@
     }
   ],
   "esmodules": [
-    "js/config.js",
     "js/monsterData.js",
     "js/actorCreation.js",
     "js/itemCreation.js",
