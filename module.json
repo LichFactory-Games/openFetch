@@ -16,11 +16,13 @@
     }
   ],
   "esmodules": [
+    "js/state.js",
     "js/monsterData.js",
     "js/actorCreation.js",
     "js/itemCreation.js",
     "js/fetchHelper.js",
     "js/dialog.js",
+    "js/selectors.js",
     "js/main.js"
   ],
   "styles": [
