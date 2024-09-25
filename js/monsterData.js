@@ -133,30 +133,104 @@ export function mapAttributes(monsterData) {
 }
 
 export function mapDetails(monsterData) {
-  return {
-    biography: {
-      value: monsterData.biography || "<p>No biography available.</p>",  // Use a default message if no biography is provided
-      public: ""  // Assuming the biography is not public by default
-    },
-    alignment: monsterData.alignment || "Unaligned",  // Default to "Unaligned" if no alignment is provided
-    race: monsterData.race || null,  // Default to null if no race is provided
-    type: {
-      value: monsterData.type || "Unknown",  // Default to "Unknown" type if not specified
-      subtype: monsterData.subtype || "",
-      swarm: monsterData.swarm || "",
-      custom: ""
-    },
-    environment: monsterData.environment || "Unknown",  // Default to "Unknown" if no environment is provided
-    cr: monsterData.cr || 1,  // Default to 1 if CR is not provided
-    spellLevel: monsterData.spellLevel || 0,  // Default to 0 if spell level is not provided
-    source: {
-      custom: monsterData.source_custom || "",
-      book: monsterData.document__title || "Open5e",  // Use the title from the document or default to "Open5e"
-      page: monsterData.page || "",
-      license: monsterData.document__license_url || "Unknown License"  // Provide a default license if not specified
+  try {
+    // Handle biography
+    const description = monsterData.desc && monsterData.desc.trim() !== ""
+          ? `<p>${monsterData.desc}</p>`
+          : "<p>No description available.</p>";
+
+    // Handle alignment
+    const alignment = monsterData.alignment && monsterData.alignment.trim() !== ""
+          ? monsterData.alignment
+          : "Unaligned";
+
+    // Handle environment
+    let environment = "Unknown";
+    if (monsterData.environment && monsterData.environment.trim() !== "") {
+      environment = monsterData.environment;
     }
-  };
+
+    // Handle challenge rating
+    const cr = monsterData.challenge_rating && monsterData.challenge_rating.trim() !== ""
+          ? parseCR(monsterData.challenge_rating)
+          : 1; // Default to 1 if not provided
+
+    // Normalize creature type to lowercase
+    const creatureType = monsterData.type
+          ? monsterData.type.toLowerCase()
+          : "unknown";
+
+    // Check if creatureType is one of the predefined types
+    const predefinedTypes = [
+      "aberration",
+      "beast",
+      "celestial",
+      "construct",
+      "dragon",
+      "elemental",
+      "fey",
+      "fiend",
+      "giant",
+      "humanoid",
+      "monstrosity",
+      "ooze",
+      "plant",
+      "undead"
+    ];
+
+    const isPredefinedType = predefinedTypes.includes(creatureType);
+
+
+    return {
+      biography: {
+        value: description,
+        public: ""
+      },
+      alignment: capitalizeFirstLetter(alignment),
+      race: null, // Could derive from 'type' or 'subtype' if applicable
+      type: {
+        value: isPredefinedType ? creatureType : "",
+        subtype: monsterData.subtype ? capitalizeFirstLetter(monsterData.subtype) : "",
+        swarm: "",
+        custom: isPredefinedType ? "" : capitalizeFirstLetter(monsterData.type) || "Unknown"
+      },
+      environment: environment,
+      cr: cr,
+      spellLevel: 0,
+      source: {
+        custom: "",
+        book: monsterData.document__title || "Open5e",
+        page: "",
+        license: monsterData.document__license_url || "Unknown License"
+      },
+      ideal: "",
+      bond: "",
+      flaw: ""
+    };
+  } catch (error) {
+    console.error("Error in mapDetails:", error);
+    return {};
+  }
 }
+
+//// Helper functions
+function capitalizeFirstLetter(string) {
+  if (!string || string.trim() === "") return "Unknown";
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function parseCR(crString) {
+  if (!crString || crString.trim() === "") return 1; // Default CR
+  if (crString.includes("/")) {
+    const [numerator, denominator] = crString.split("/").map(Number);
+    return numerator / denominator;
+  } else {
+    const crNumber = Number(crString);
+    return isNaN(crNumber) ? 1 : crNumber;
+  }
+}
+/////
+
 
 export function mapTraitData(monsterData) {
   return {
@@ -294,27 +368,31 @@ export function extractResources(monsterData) {
   let lairActions = false;
   let lairInitiative = null;
 
-  // Loop through special abilities to find relevant details
+  // Extract Legendary Resistances from special abilities
   monsterData.special_abilities?.forEach(ability => {
+    const abilityName = ability.name.toLowerCase();
+
     // Checking for Legendary Resistance
-    if (ability.name.toLowerCase().includes("legendary resistance")) {
-      const resistanceMatch = ability.name.match(/(\d+)\/Day/i);  // Attempt to extract the number from the name field
-      legendaryResistances = resistanceMatch ? parseInt(resistanceMatch[1], 10) : legendaryResistances;
+    if (abilityName.includes("legendary resistance")) {
+      const resistanceMatch = ability.name.match(/legendary resistance\s*\((\d+)\s*\/\s*day\)/i);
+      legendaryResistances = resistanceMatch ? parseInt(resistanceMatch[1], 10) : 3; // Default to 3 if not specified
     }
-    if (ability.name.toLowerCase().includes("lair actions")) {
+
+    // Checking for Lair Actions
+    if (abilityName.includes("lair actions")) {
       lairActions = true;
-      const initiativeMatch = ability.desc.match(/at initiative count (\d+)/i);
-      lairInitiative = initiativeMatch ? parseInt(initiativeMatch[1], 10) : lairInitiative;
+      const initiativeMatch = ability.desc.match(/initiative count (\d+)/i);
+      lairInitiative = initiativeMatch ? parseInt(initiativeMatch[1], 10) : 20; // Default to 20
     }
   });
 
-  // Extract number of legendary actions if explicitly stated in any description (fallback method)
-  monsterData.legendary_actions?.forEach(action => {
-    if (action.name.includes("can take")) {
-      const actionMatch = action.desc.match(/can take (\d+) legendary actions/i);
-      legendaryActions = actionMatch ? parseInt(actionMatch[1], 10) : 3; // Default to 3 if not specifically mentioned
-    }
-  });
+  // Extract Legendary Actions count from legendary_desc
+  if (monsterData.legendary_desc) {
+    const legActionMatch = monsterData.legendary_desc.match(/can take (\d+) legendary actions/i);
+    legendaryActions = legActionMatch ? parseInt(legActionMatch[1], 10) : 3; // Default to 3
+  } else if (monsterData.legendary_actions?.length > 0) {
+    legendaryActions = 3; // Default to 3 if legendary actions are present but count isn't specified
+  }
 
   return {
     legact: { value: legendaryActions, max: legendaryActions },
