@@ -1,4 +1,5 @@
 import { handleSearchInput, handleFetch, selectResult } from './fetchHelper.js';
+import { createFilterSelects } from './selectors.js';
 
 export class MonsterSearchDialog {
   constructor() {
@@ -15,6 +16,7 @@ export class MonsterSearchDialog {
       default: "fetch",
       render: (html) => {
         this.setupEventHandlers();  // Attach event handlers after rendering
+        this.appendFilterSelects(); // Append filter selects after rendering
         this.adjustDialogSize();
       },
       close: () => console.log("Dialog closed")
@@ -51,6 +53,15 @@ export class MonsterSearchDialog {
     }
   }
 
+  appendFilterSelects() {
+    const filterContainer = document.getElementById('filterContainer');
+    if (filterContainer) {
+      const filterSelects = createFilterSelects();
+      filterContainer.appendChild(filterSelects);
+    } else {
+      console.error("Filter container not found in the DOM.");
+    }
+  }
 
   // Method to set up event handlers for the search input
   setupEventHandlers() {
