@@ -1,71 +1,52 @@
 import { createFoundryActor } from "./actorCreation.js";
 
-let searchTimeout = null;  // Declare searchTimeout in a higher context
+let searchTimeout = null;  // For debouncing the search input
+let selectedMonsterData = null;  // To store the selected monster data
 
 // Handle fetching the monster data after a search
 export async function handleFetch(html) {
-  const monsterNameField = document.getElementById('monsterName').value;
-  const monsterSource = document.getElementById('monsterSource').value;
-
-  const monsterName = monsterNameField.split(' (Source: ')[0];
-
-  if (!monsterName) {
+  if (!selectedMonsterData) {
     ui.notifications.warn('Please select a monster from search results.');
     return;
   }
   try {
-    const monsterData = await fetchMonsterData(monsterName, monsterSource); // No 'this' here
-    if (monsterData) {
-      await createFoundryActor(monsterData);
-    } else {
-      ui.notifications.warn('No results found. Please check the monster name.');
-    }
+    // Use the stored monster data to create the actor
+    await createFoundryActor(selectedMonsterData);
   } catch (error) {
-    console.error('Error fetching data:', error);
-    ui.notifications.error('Error fetching data: ' + error.message);
+    console.error('Error creating actor:', error);
+    ui.notifications.error('Error creating actor: ' + error.message);
   }
-}
-
-// Fetch monster data from Open5e
-export async function fetchMonsterData(monsterName, monsterSource) {
-  const url = `https://api.open5e.com/monsters/?search=${encodeURIComponent(monsterName)}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Failed to fetch data');
-
-  const data = await response.json();
-  const exactMatch = data.results.find(monster =>
-    monster.name.toLowerCase() === monsterName.toLowerCase() &&
-      monster.document__slug === monsterSource
-  );
-
-  return exactMatch;
 }
 
 // Handle search input with debounce
 export async function handleSearchInput(value) {
-  clearTimeout(searchTimeout);  // No 'this' needed here
+  clearTimeout(searchTimeout);
   searchTimeout = setTimeout(async () => {
+    const resultsContainer = document.getElementById('searchResults');
+    resultsContainer.innerHTML = 'Searching...';
+
     const searchResults = await searchMonsters(value);
-    displaySearchResults(searchResults.results);  // Ensure we're passing the correct part of the result
-  }, 300);
+    displaySearchResults(searchResults.results);
+  }, 250);
 }
 
 // Perform search request to Open5e API
-async function searchMonsters(query) {
+export async function searchMonsters(query) {
   const url = `https://api.open5e.com/monsters/?search=${encodeURIComponent(query)}&ordering=challenge_rating`;
   const response = await fetch(url);
-  return await response.json();  // Return the full result
+  return await response.json();
 }
 
 // Method to handle the selection of a search result
 export function selectResult(monster) {
   const monsterNameField = document.getElementById('monsterName');
-  const monsterSourceField = document.getElementById('monsterSource');
   const resultsContainer = document.getElementById('searchResults');
 
-  // Set the selected monster name and source
+  // Store the selected monster data
+  selectedMonsterData = monster;
+
+  // Display the selected monster's name and source in the input field
   monsterNameField.value = `${monster.name} (Source: ${monster.document__slug.toUpperCase()})`;
-  monsterSourceField.value = monster.document__slug;
 
   // Hide the search results container
   resultsContainer.style.display = 'none';
@@ -77,6 +58,12 @@ export function selectResult(monster) {
 function displaySearchResults(results) {
   const resultsContainer = document.getElementById('searchResults');
   resultsContainer.innerHTML = '';  // Clear previous results
+
+
+  if (results.length === 0) {
+    resultsContainer.textContent = 'No monsters found.';
+    return;
+  }
 
   // Loop through the results and create a div for each monster
   results.forEach(monster => {
@@ -92,5 +79,3 @@ function displaySearchResults(results) {
     resultsContainer.appendChild(resultDiv);  // Append the result to the container
   });
 }
-
-

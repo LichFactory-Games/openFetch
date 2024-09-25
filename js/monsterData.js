@@ -38,6 +38,41 @@ const skillMapping = {
 };
 
 //// Mapping functions
+// Map nearest monster image from srd to open5e monster
+export async function mapImage(monsterName) {
+  // Get the D&D 5e SRD Monsters compendium
+  const compendium = game.packs.get('dnd5e.monsters');
+  if (!compendium) {
+    console.warn('Compendium dnd5e.monsters not found.');
+    return null;
+  }
+
+  // Get the index of the compendium with the 'img' field included
+  const index = await compendium.getIndex({ fields: ['img'] });
+
+  // Normalize the monster name for comparison
+  const normalizeName = name => name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').trim();
+  const normalizedMonsterName = normalizeName(monsterName);
+
+  // Try to find an exact match first
+  let entry = index.find(e => normalizeName(e.name) === normalizedMonsterName);
+
+  // If no exact match, try partial matches
+  if (!entry) {
+    entry = index.find(e =>
+      normalizeName(e.name).includes(normalizedMonsterName) ||
+        normalizedMonsterName.includes(normalizeName(e.name))
+    );
+  }
+
+  if (entry) {
+    return entry.img;
+  } else {
+    console.warn(`Monster "${monsterName}" not found in compendium.`);
+    return null;
+  }
+}
+
 export function mapAbilities(monsterData) {
   return {
     str: { value: monsterData.strength },
