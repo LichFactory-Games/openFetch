@@ -8,6 +8,7 @@
   },
   "description": "A module to fetch monsters from Open5e",
   "url": "https://github.com/LichFactory-Games/openFetch",
+  "manifest": "https://raw.githubusercontent.com/LichFactory-Games/openFetch/refs/heads/main/module.json",
   "authors": [
     {
       "name": "LichLife"
