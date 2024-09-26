@@ -110,7 +110,21 @@ function prioritizeExactMatches(results, query) {
 }
 
 // Method to handle the selection of a search result
-export function selectResult(monster) {
+export function selectResult(monsterOrElement) {
+  let monster;
+  if (monsterOrElement instanceof Element) {
+    // If a DOM element was passed (from keyboard navigation)
+    monster = monsterOrElement.monsterData;
+  } else {
+    // If a monster object was passed (from click event)
+    monster = monsterOrElement;
+  }
+
+  if (!monster) {
+    console.error('Invalid monster data');
+    return;
+  }
+
   const monsterNameField = document.getElementById('monsterName');
   const resultsContainer = document.getElementById('searchResults');
 
@@ -118,7 +132,7 @@ export function selectResult(monster) {
   state.selectedMonsterData = monster;
 
   // Display the selected monster's name and source in the input field
-  monsterNameField.value = `${monster.name} (Source: ${monster.document__slug.toUpperCase()})`;
+  monsterNameField.value = `${monster.name} (Source: ${monster.document__slug ? monster.document__slug.toUpperCase() : 'No Source'})`;
 
   // Hide the search results container
   resultsContainer.style.display = 'none';
@@ -127,7 +141,7 @@ export function selectResult(monster) {
 }
 
 // Display search results in the UI and make them selectable
-function displaySearchResults(results) {
+export function displaySearchResults(results) {
   const resultsContainer = document.getElementById('searchResults');
   resultsContainer.innerHTML = '';  // Clear previous results
 
@@ -139,18 +153,14 @@ function displaySearchResults(results) {
   // Show the results container
   resultsContainer.style.display = 'block';
 
-  const inputValue = document.getElementById('monsterName').value.toLowerCase().trim();
-
   // Loop through the results and create a div for each monster
   results.forEach(monster => {
     const resultDiv = document.createElement('div');
     resultDiv.textContent = `${monster.name} (CR ${monster.challenge_rating || 'Unknown'}) - Source: ${monster.document__slug ? monster.document__slug.toUpperCase() : 'No Source'}`;
     resultDiv.classList.add('search-result');
 
-    // // Highlight exact matches
-    // if (monster.name.toLowerCase() === inputValue) {
-    //   resultDiv.classList.add('exact-match');
-    // }
+    // Store the monster data on the div element
+    resultDiv.monsterData = monster;
 
     // Attach a click event listener to the result
     resultDiv.addEventListener('click', () => {
