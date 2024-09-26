@@ -139,59 +139,54 @@ function calculateAttackBonus(action, monsterData) {
 function parseDamage(action) {
   const attackRegex = /(Melee|Ranged) Weapon Attack: \+(\d+) to hit/;
   const damageRegex = /(\d+d\d+\s*(?:\+\s*\d+)?)(?:\s+([a-z]+))?/gi;
+  const saveRegex = /DC\s+(\d+)\s+([A-Za-z]+)(?:\s+saving throw)/i;
 
   const attackParts = attackRegex.exec(action.desc);
   let attackType = "other";
   let ability = "default";
-
   if (attackParts) {
     attackType = attackParts[1].toLowerCase() === "melee" ? "mwak" : "rwak";
-    ability = attackType === "mwak" ? "str" : "dex";  // Corrected assignment
+    ability = attackType === "mwak" ? "str" : "dex";
   }
 
   const damageParts = [];
   const splitDamageParts = action.desc.split(" plus ");
-
   splitDamageParts.forEach(part => {
     let match;
     while ((match = damageRegex.exec(part)) !== null) {
       let formula = match[1].trim();
       let type = match[2] ? match[2].trim() : "";
-
       if (!type) {
         type = Object.keys(CONFIG.DND5E.damageTypes).find(dt => part.toLowerCase().includes(dt)) || "";
       }
-
       if (formula) {
         damageParts.push([formula, type]);
       }
     }
   });
 
-  return { attackType, ability, damageParts };
+  const saveParts = saveRegex.exec(action.desc);
+  let saveData = null;
+  if (saveParts) {
+    saveData = {
+      dc: parseInt(saveParts[1]),
+      ability: saveParts[2].toLowerCase().slice(0, 3)
+    };
+  }
+
+  return { attackType, ability, damageParts, saveData };
 }
 
 async function createItem(actor, action, config, monsterData) {
   console.log("DEBUG: Monster data before creating items:", monsterData);
-
-  // Determine the item type and activation type from config
   const itemType = config.type || 'feat';
   const activationType = config.activationType || '';
-
-  // Get attack and ability calculation
   const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
-
-  // Handle spellcasting-specific actions and format description
   let description = handleSpellcasting(action, action.desc || '');
-
-  // Fetch appropriate icon for the action
   const icon = await fetchIcon(action.name, monsterData.name);
+  const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(action);
+  const additionalProperties = getAdditionalProperties(config, action);
 
-
-  // Parse damage and attack details
-  const { attackType, ability: attackAbility, damageParts } = parseDamage(action);
-
-  // Create final item object
   const newItem = {
     name: action.name,
     type: itemType,
@@ -202,7 +197,7 @@ async function createItem(actor, action, config, monsterData) {
         chat: description,
         enrichedText: true
       },
-      activation: {
+      activation: additionalProperties.activation || {
         type: activationType,
         cost: activationType ? 1 : null,
         condition: ""
@@ -223,21 +218,28 @@ async function createItem(actor, action, config, monsterData) {
         versatile: ""
       },
       ability: attackAbility,
-      actionType: attackType,
+      actionType: saveData ? "save" : attackType,
       attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
       proficient: true,
-      save: {
-        ability: action.save_ability?.toLowerCase() || "",
-        dc: action.save_dc || null,
+      save: saveData ? {
+        ability: saveData.ability,
+        dc: saveData.dc,
         scaling: "flat"
-      }
+      } : null,
+      ...additionalProperties
     }
   };
+
+  if (saveData) {
+    newItem.system.ability = saveData.ability;
+  }
+
+  // Merge any additional properties
+  Object.assign(newItem.system, additionalProperties);
 
   await actor.createEmbeddedDocuments('Item', [newItem]);
   console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
 }
-
 
 function getAdditionalProperties(config, action) {
   const properties = {};
