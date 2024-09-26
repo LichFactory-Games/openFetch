@@ -1,18 +1,23 @@
 import { ensureCreaturesFolder, createItemsForActor } from './itemCreation.js';
-import { mapSize, mapAbilities, mapAttributes, mapDetails, mapSkills, mapTraitData, mapImage, extractResources, extractBonuses } from './monsterData.js';
+import { mapSize, mapAbilities, mapAttributes, mapDetails, mapSavingThrows, mapSkills, mapTraitData, mapImage, extractResources, extractBonuses } from './monsterData.js';
 
 export async function createFoundryActor(monsterData) {
   const folder = await ensureCreaturesFolder();
-  // Fetch the monster image before creating actorData
   const monsterImage = await mapImage(monsterData.name);
+
+  // Map abilities
+  const abilities = mapAbilities(monsterData);
+
+  // Update abilities with saving throws
+  mapSavingThrows(monsterData, abilities); // Modifies abilities in-place
 
   const actorData = {
     name: monsterData.name,
     type: "npc",
     folder: folder.id,
-    img: monsterImage || "icons/svg/mystery-man.svg", // Use the fetched image or default
+    img: monsterImage || "icons/svg/mystery-man.svg",
     system: {
-      abilities: mapAbilities(monsterData),
+      abilities: abilities, // Use the updated abilities object
       attributes: mapAttributes(monsterData),
       details: mapDetails(monsterData),
       traits: {

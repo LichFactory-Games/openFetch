@@ -15,6 +15,18 @@ export function mapSize(size) {
   return sizeMap[size.toLowerCase()] || "med";
 }
 
+const abilitiesList = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+
+const abilityMapping = {
+  str: 'strength',
+  dex: 'dexterity',
+  con: 'constitution',
+  int: 'intelligence',
+  wis: 'wisdom',
+  cha: 'charisma'
+};
+
+
 // Skills as a constant
 const skillMapping = {
   "Acrobatics": { id: "acr", ability: "dex" },
@@ -74,15 +86,51 @@ export async function mapImage(monsterName) {
 }
 
 export function mapAbilities(monsterData) {
-  return {
-    str: { value: monsterData.strength },
-    dex: { value: monsterData.dexterity },
-    con: { value: monsterData.constitution },
-    int: { value: monsterData.intelligence },
-    wis: { value: monsterData.wisdom },
-    cha: { value: monsterData.charisma }
-  };
+  const abilities = {};
+
+  for (const ab of abilitiesList) {
+    const abilityScore = Number(monsterData[abilityMapping[ab]]);
+    const abilityModifier = Math.floor((abilityScore - 10) / 2);
+
+    abilities[ab] = {
+      value: abilityScore,
+      mod: abilityModifier,
+      proficient: 0, // Will be updated in mapSavingThrows
+      bonuses: {
+        check: "", // Additional bonuses to ability checks
+        save: "",  // Additional bonuses to saving throws
+      },
+      max: null, // Optional, can be omitted if not needed
+    };
+  }
+  return abilities;
 }
+
+export function mapSavingThrows(monsterData, abilities) {
+  const proficiencyBonus = calculateProficiencyBonus(monsterData.challenge_rating);
+
+  for (const ab in abilities) {
+    const saveField = `${abilityMapping[ab]}_save`;
+    let saveTotalModifier = monsterData[saveField];
+
+    if (saveTotalModifier !== null && saveTotalModifier !== undefined) {
+      saveTotalModifier = Number(saveTotalModifier);
+      const abilityModifier = abilities[ab].mod;
+
+      // Monster is proficient in this saving throw
+      abilities[ab].proficient = 1;
+
+      // Calculate any additional bonus
+      const expectedModifier = abilityModifier + proficiencyBonus;
+      let bonus = saveTotalModifier - expectedModifier;
+
+      // Assign bonuses
+      abilities[ab].bonuses.save = bonus !== 0 ? `${bonus}` : "";
+    }
+  }
+}
+
+
 
 export function mapAttributes(monsterData) {
   return {
@@ -244,40 +292,84 @@ export function mapTraitData(monsterData) {
 
 export function mapSkills(monsterData) {
   const skills = {};
+  const proficiencyBonus = calculateProficiencyBonus(monsterData.challenge_rating);
+
   for (const [skillName, skillInfo] of Object.entries(skillMapping)) {
-    const skillValue = monsterData.skills[skillName.toLowerCase()];
-    if (skillValue !== undefined) {
-      skills[skillInfo.id] = {
-        value: skillValue,
-        ability: skillInfo.ability,
-        bonuses: {
-          check: "0",
-          passive: ""
-        },
-        roll: {
-          min: null,
-          max: null,
-          mode: 0
-        }
-      };
-    } else {
-      skills[skillInfo.id] = {
-        value: 0,
-        ability: skillInfo.ability,
-        bonuses: {
-          check: "0",
-          passive: ""
-        },
-        roll: {
-          min: null,
-          max: null,
-          mode: 0
-        }
-      };
+    const skillKey = skillName.toLowerCase();
+    let skillTotalModifier = monsterData.skills ? monsterData.skills[skillKey] : undefined;
+
+    if (skillTotalModifier !== undefined && skillTotalModifier !== null) {
+      skillTotalModifier = Number(skillTotalModifier);
     }
+
+    const abilityName = abilityMapping[skillInfo.ability];
+    const abilityScore = Number(monsterData[abilityName]);
+    const abilityModifier = Math.floor((abilityScore - 10) / 2);
+
+    let value = 0; // Proficiency level
+    let bonus = "";
+
+    if (!isNaN(skillTotalModifier)) {
+      const expectedModifierProficient = abilityModifier + proficiencyBonus;
+      const expectedModifierExpertise = abilityModifier + (proficiencyBonus * 2);
+
+      if (skillTotalModifier === expectedModifierExpertise) {
+        value = 2; // Expertise
+      } else if (skillTotalModifier === expectedModifierProficient) {
+        value = 1; // Proficient
+      } else if (skillTotalModifier > expectedModifierExpertise) {
+        value = 2; // Expertise
+        bonus = `${skillTotalModifier - expectedModifierExpertise}`;
+      } else if (skillTotalModifier > expectedModifierProficient) {
+        value = 1; // Proficient
+        bonus = `${skillTotalModifier - expectedModifierProficient}`;
+      } else {
+        // Not proficient, but has a bonus or penalty
+        value = 0;
+        bonus = `${skillTotalModifier - abilityModifier}`;
+      }
+    }
+
+    skills[skillInfo.id] = {
+      value: value,
+      ability: skillInfo.ability,
+      bonuses: {
+        check: bonus,   // Additional bonuses to skill checks
+        passive: "",    // Additional bonuses to passive checks
+      },
+    };
   }
   return skills;
 }
+
+
+
+
+//// Helper function
+export function calculateProficiencyBonus(challengeRating) {
+  let cr = challengeRating;
+  if (typeof cr === 'string') {
+    if (cr.includes('/')) {
+      const [numerator, denominator] = cr.split('/').map(Number);
+      cr = numerator / denominator;
+    } else {
+      cr = parseFloat(cr);
+    }
+  }
+  if (isNaN(cr)) {
+    console.warn(`Invalid challenge rating: ${challengeRating}. Defaulting proficiency bonus to 2.`);
+    cr = 0;
+  }
+  // Proficiency bonus calculation based on D&D 5e rules
+  if (cr >= 1) {
+    return Math.floor((cr - 1) / 4) + 2;
+  } else {
+    return 2; // For CR 0
+  }
+}
+/////
+
+
 
 export function mapMovement(speed) {
   const movement = {};
