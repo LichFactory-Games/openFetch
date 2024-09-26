@@ -76,7 +76,9 @@ export class MonsterSearchDialog extends Dialog {
     if (searchInput) {
       searchInput.oninput = () => handleSearchInput(searchInput.value);
 
-      searchInput.addEventListener('keydown', this._onKeyDown.bind(this));
+      // Remove the keydown event listener from the input
+      // and add it to the dialog element instead
+      this.element[0].addEventListener('keydown', this._onKeyDown.bind(this));
 
       const resultsContainer = this.element[0].querySelector('#searchResults');
       if (resultsContainer) {
@@ -94,18 +96,24 @@ export class MonsterSearchDialog extends Dialog {
     const resultsContainer = this.element[0].querySelector('#searchResults');
     if (!resultsContainer || !resultsContainer.children.length) return;
 
-    let activeItem = resultsContainer.querySelector('.active');
-    let items = Array.from(resultsContainer.children);
+    const activeItem = resultsContainer.querySelector('.active');
+    const items = Array.from(resultsContainer.children);
 
     const isDownKey = event.key === 'ArrowDown' || (event.ctrlKey && event.key === 'n');
     const isUpKey = event.key === 'ArrowUp' || (event.ctrlKey && event.key === 'p');
 
     if (isDownKey || isUpKey) {
       event.preventDefault();
+      event.stopPropagation(); // Stop the event from bubbling
       this.navigateResults(items, activeItem, isDownKey);
     } else if (event.key === 'Enter') {
       event.preventDefault();
+      event.stopPropagation(); // Stop the event from bubbling
       if (activeItem) selectResult(activeItem);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation(); // Stop the event from bubbling
+      this.close();
     }
 
     console.log('Key pressed:', event.key, 'Ctrl:', event.ctrlKey);
@@ -113,18 +121,20 @@ export class MonsterSearchDialog extends Dialog {
   }
 
   navigateResults(items, activeItem, isDownKey) {
+    let newIndex;
     if (!activeItem) {
-      items[isDownKey ? 0 : items.length - 1].classList.add('active');
+      newIndex = isDownKey ? 0 : items.length - 1;
     } else {
-      let currentIndex = items.indexOf(activeItem);
-      let newIndex = isDownKey
-          ? (currentIndex + 1) % items.length
-          : (currentIndex - 1 + items.length) % items.length;
+      const currentIndex = items.indexOf(activeItem);
+      newIndex = isDownKey
+        ? (currentIndex + 1) % items.length
+        : (currentIndex - 1 + items.length) % items.length;
       activeItem.classList.remove('active');
-      items[newIndex].classList.add('active');
-      items[newIndex].scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
+    items[newIndex].classList.add('active');
+    items[newIndex].scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
+
 
   handleFetch(html) {
     handleFetch();
