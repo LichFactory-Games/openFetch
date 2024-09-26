@@ -33,6 +33,9 @@ export async function createFoundryActor(monsterData) {
   const actor = await Actor.create(actorData);
   await createItemsForActor(actor, monsterData);
 
+  ui.notifications.notify(`${actor.name} successfully fetched!`, 'success');
+
   console.log(`Actor created: ${actor.name}`);
   return actor;
+
 }
