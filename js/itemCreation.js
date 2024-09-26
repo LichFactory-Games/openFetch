@@ -1,5 +1,10 @@
 import { calculateProficiencyBonus, abilityMapping } from "./monsterData.js";
 
+
+function normalizeText(text) {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').trim();
+}
+
 // Put fetched monsters in "Creatures" Folder
 export async function ensureCreaturesFolder() {
   // Check if the "Creatures" folder already exists
@@ -13,7 +18,6 @@ export async function ensureCreaturesFolder() {
       parent: null  // or set a specific parent folder ID if nested
     });
   }
-
   return folder;
 }
 
@@ -53,56 +57,66 @@ export async function createItemsForActor(actor, monsterData) {
 }
 
 
-function normalizeText(text) {
-  return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').trim();
-}
+async function fetchIcon(actionName, monsterName) {
+  console.log(`Searching for icon for action: ${actionName} of monster: ${monsterName}`);
 
-async function fetchIcon(actionName) {
-  // Default icon URL
-  let icon = "modules/openFetch/icons/default-icon.webp";
+  // Step 1: Try to find a matching monster in the SRD
+  const monsterPack = game.packs.get('dnd5e.monsters');
+  if (monsterPack) {
+    const monsterIndex = await monsterPack.getIndex({ fields: ['name', 'items'] });
+    let matchingMonster = monsterIndex.find(m => normalizeText(m.name) === normalizeText(monsterName));
 
-
-  // List of compendiums to search
-  const compendiums = [
-    game.packs.get('dnd5e.monsterfeatures'),
-    game.packs.get('dnd5e.monsters'),
-    game.packs.get('dnd5e.items'),
-    game.packs.get('dnd5e.spells')
-  ];
-
-  for (let compendium of compendiums) {
-    // Get the index of all items in the compendium
-    const index = await compendium.getIndex();
-
-    // Try to find an exact match first
-    let itemEntry = index.find(i => normalizeText(i.name) === normalizeText(actionName));
-
-    if (itemEntry) {
-      const itemDocument = await compendium.getDocument(itemEntry._id);
-      icon = itemDocument.img || icon;
-      break; // Stop searching if a match is found
+    // If no exact match, try partial match
+    if (!matchingMonster) {
+      matchingMonster = monsterIndex.find(m =>
+        normalizeText(m.name).includes(normalizeText(monsterName)) ||
+          normalizeText(monsterName).includes(normalizeText(m.name))
+      );
     }
 
-    // If no exact match, try to find a partial match where the item name includes the action name
-    itemEntry = index.find(i => normalizeText(i.name).includes(normalizeText(actionName)));
+    if (matchingMonster) {
+      console.log(`Found matching monster in SRD: ${matchingMonster.name}`);
 
-    if (itemEntry) {
-      const itemDocument = await compendium.getDocument(itemEntry._id);
-      icon = itemDocument.img || icon;
-      break;
-    }
+      // Fetch the full monster data to access its items
+      const monster = await monsterPack.getDocument(matchingMonster._id);
+      const matchingItem = monster.items.find(item => normalizeText(item.name) === normalizeText(actionName));
 
-    // Alternatively, check if the action name includes the item name
-    itemEntry = index.find(i => normalizeText(actionName).includes(normalizeText(i.name)));
-
-    if (itemEntry) {
-      const itemDocument = await compendium.getDocument(itemEntry._id);
-      icon = itemDocument.img || icon;
-      break;
+      if (matchingItem) {
+        console.log(`Found matching item: ${matchingItem.name}, Icon: ${matchingItem.img}`);
+        return matchingItem.img;
+      }
     }
   }
 
-  return icon;
+  // Step 2: If no match in SRD monster, fall back to searching all compendiums
+  console.log("No match found in SRD monster, falling back to general search");
+  return fallbackIconSearch(actionName);
+}
+
+
+
+async function fallbackIconSearch(actionName) {
+  const normalizedActionName = normalizeText(actionName);
+  const relevantPacks = ['dnd5e.monsters', 'dnd5e.monsterfeatures', 'dnd5e.items', 'dnd5e.spells'];
+
+  for (const packKey of relevantPacks) {
+    const pack = game.packs.get(packKey);
+    if (pack) {
+      const index = await pack.getIndex({ fields: ['name', 'img'] });
+      let match = index.find(i => normalizeText(i.name) === normalizedActionName);
+      if (!match) {
+        match = index.find(i => normalizeText(i.name).includes(normalizedActionName) ||
+                           normalizedActionName.includes(normalizeText(i.name)));
+      }
+      if (match) {
+        console.log(`Found icon in ${packKey}: ${match.img}`);
+        return match.img;
+      }
+    }
+  }
+
+  console.log(`No icon found for ${actionName}, using default`);
+  return "modules/openFetch/icons/default-icon.webp";
 }
 
 function calculateAttackBonus(action, monsterData) {
@@ -171,7 +185,8 @@ async function createItem(actor, action, config, monsterData) {
   let description = handleSpellcasting(action, action.desc || '');
 
   // Fetch appropriate icon for the action
-  const icon = await fetchIcon(action.name);
+  const icon = await fetchIcon(action.name, monsterData.name);
+
 
   // Parse damage and attack details
   const { attackType, ability: attackAbility, damageParts } = parseDamage(action);
