@@ -1,3 +1,5 @@
+import { calculateProficiencyBonus, abilityMapping } from "./monsterData.js";
+
 // Put fetched monsters in "Creatures" Folder
 export async function ensureCreaturesFolder() {
   // Check if the "Creatures" folder already exists
@@ -45,7 +47,7 @@ export async function createItemsForActor(actor, monsterData) {
       createdItemNames.add(itemName);
 
       // Create the item
-      await createItem(actor, ability, config);
+      await createItem(actor, ability, config, monsterData);
     }
   }
 }
@@ -103,20 +105,21 @@ async function fetchIcon(actionName) {
   return icon;
 }
 
-function handleSpellcasting(action, description) {
-  if (action.name.toLowerCase().includes("spellcasting")) {
-    const spellcastingDetails = parseDynamicSpellcasting(description);
+function calculateAttackBonus(action, monsterData) {
+  const attackBonusMatch = action.desc.match(/^\w+ Weapon Attack: \+(\d+) to hit/i);
+  const totalAttackBonus = attackBonusMatch ? parseInt(attackBonusMatch[1]) : null;
 
-    if (spellcastingDetails) {
-      // Use formatted spellcasting details
-      description = formatDynamicSpellcastingDescription(spellcastingDetails);
-      return description; // Return early since we've formatted the description
-    }
-  }
+  if (!totalAttackBonus) return { itemAttackBonus: null, expectedAttackBonus: null };
 
-  // Only replace newlines with <br> if this isn't spellcasting
-  description = description.replace(/\n/g, '<br>');
-  return description;
+  const proficiencyBonus = calculateProficiencyBonus(monsterData.challenge_rating);
+  const { ability } = parseDamage(action);
+  const abilityScore = Number(monsterData[abilityMapping[ability]]);
+  const abilityModifier = Math.floor((abilityScore - 10) / 2);
+
+  const expectedAttackBonus = abilityModifier + proficiencyBonus;
+  const itemAttackBonus = totalAttackBonus - expectedAttackBonus;
+
+  return { itemAttackBonus: itemAttackBonus > 0 ? itemAttackBonus : null, expectedAttackBonus };
 }
 
 function parseDamage(action) {
@@ -129,7 +132,7 @@ function parseDamage(action) {
 
   if (attackParts) {
     attackType = attackParts[1].toLowerCase() === "melee" ? "mwak" : "rwak";
-    ability = `@abilities.${attackType === "mwak" ? "str" : "dex"}.mod`;  // Use dynamic ability modifier
+    ability = attackType === "mwak" ? "str" : "dex";  // Corrected assignment
   }
 
   const damageParts = [];
@@ -154,15 +157,18 @@ function parseDamage(action) {
   return { attackType, ability, damageParts };
 }
 
-async function createItem(actor, action, config) {
+async function createItem(actor, action, config, monsterData) {
+  console.log("DEBUG: Monster data before creating items:", monsterData);
+
   // Determine the item type and activation type from config
   const itemType = config.type || 'feat';
   const activationType = config.activationType || '';
 
-  let description = action.desc || '';
+  // Get attack and ability calculation
+  const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
 
-  // Handle spellcasting-specific actions
-  description = handleSpellcasting(action, description);
+  // Handle spellcasting-specific actions and format description
+  let description = handleSpellcasting(action, action.desc || '');
 
   // Fetch appropriate icon for the action
   const icon = await fetchIcon(action.name);
@@ -170,7 +176,7 @@ async function createItem(actor, action, config) {
   // Parse damage and attack details
   const { attackType, ability: attackAbility, damageParts } = parseDamage(action);
 
-  // Final item object
+  // Create final item object
   const newItem = {
     name: action.name,
     type: itemType,
@@ -188,9 +194,8 @@ async function createItem(actor, action, config) {
       },
       target: {
         value: "1",
-        width: null,
-        units: "",
         type: "creature",
+        units: "",
         prompt: true
       },
       range: {
@@ -204,20 +209,20 @@ async function createItem(actor, action, config) {
       },
       ability: attackAbility,
       actionType: attackType,
+      attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
       proficient: true,
       save: {
         ability: action.save_ability?.toLowerCase() || "",
         dc: action.save_dc || null,
         scaling: "flat"
-      },
-      // Include any additional properties from config or action
-      ...getAdditionalProperties(config, action)
+      }
     }
   };
 
   await actor.createEmbeddedDocuments('Item', [newItem]);
   console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
 }
+
 
 function getAdditionalProperties(config, action) {
   const properties = {};
@@ -247,6 +252,22 @@ function getAdditionalProperties(config, action) {
   // For example, handling recharge, consumables, etc.
 
   return properties;
+}
+
+function handleSpellcasting(action, description) {
+  if (action.name.toLowerCase().includes("spellcasting")) {
+    const spellcastingDetails = parseDynamicSpellcasting(description);
+
+    if (spellcastingDetails) {
+      // Use formatted spellcasting details
+      description = formatDynamicSpellcastingDescription(spellcastingDetails);
+      return description; // Return early since we've formatted the description
+    }
+  }
+
+  // Only replace newlines with <br> if this isn't spellcasting
+  description = description.replace(/\n/g, '<br>');
+  return description;
 }
 
 export function parseDynamicSpellcasting(description) {

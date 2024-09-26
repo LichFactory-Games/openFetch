@@ -15,9 +15,9 @@ export function mapSize(size) {
   return sizeMap[size.toLowerCase()] || "med";
 }
 
-const abilitiesList = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+export const abilitiesList = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
-const abilityMapping = {
+export const abilityMapping = {
   str: 'strength',
   dex: 'dexterity',
   con: 'constitution',
@@ -28,7 +28,7 @@ const abilityMapping = {
 
 
 // Skills as a constant
-const skillMapping = {
+export const skillMapping = {
   "Acrobatics": { id: "acr", ability: "dex" },
   "Animal Handling": { id: "ani", ability: "wis" },
   "Arcana": { id: "arc", ability: "int" },
