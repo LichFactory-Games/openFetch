@@ -92,8 +92,27 @@ export class MonsterSearchDialog extends Dialog {
     }
   }
 
+
   _onKeyDown(event) {
     const resultsContainer = this.element[0].querySelector('#searchResults');
+    const monsterNameInput = this.element[0].querySelector('#monsterName');
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (monsterNameInput && monsterNameInput.value) {
+        // If a monster is selected (monsterName is populated), trigger the fetch
+        this.handleFetch();
+        return;
+      } else if (resultsContainer && resultsContainer.children.length) {
+        // If no monster is selected yet, but there are search results, select the active one
+        const activeItem = resultsContainer.querySelector('.active');
+        if (activeItem) selectResult(activeItem);
+        return;
+      }
+    }
+
     if (!resultsContainer || !resultsContainer.children.length) return;
 
     const activeItem = resultsContainer.querySelector('.active');
@@ -104,15 +123,11 @@ export class MonsterSearchDialog extends Dialog {
 
     if (isDownKey || isUpKey) {
       event.preventDefault();
-      event.stopPropagation(); // Stop the event from bubbling
+      event.stopPropagation();
       this.navigateResults(items, activeItem, isDownKey);
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      event.stopPropagation(); // Stop the event from bubbling
-      if (activeItem) selectResult(activeItem);
     } else if (event.key === 'Escape') {
       event.preventDefault();
-      event.stopPropagation(); // Stop the event from bubbling
+      event.stopPropagation();
       this.close();
     }
 
@@ -138,5 +153,6 @@ export class MonsterSearchDialog extends Dialog {
 
   handleFetch(html) {
     handleFetch();
+    this.close(); // Optionally close the dialog after fetching
   }
 }

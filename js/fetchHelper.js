@@ -91,6 +91,42 @@ export async function searchMonsters(query, options = {}) {
   }
 }
 
+// Display search results in the UI and make them selectable
+export function displaySearchResults(results) {
+  const resultsContainer = document.getElementById('searchResults');
+  resultsContainer.innerHTML = '';  // Clear previous results
+
+  if (results.length === 0) {
+    resultsContainer.textContent = 'No monsters found.';
+    return;
+  }
+
+  // Show the results container
+  resultsContainer.style.display = 'block';
+
+  // Loop through the results and create a div for each monster
+  results.forEach(monster => {
+    const resultDiv = document.createElement('div');
+    resultDiv.textContent = `${monster.name} (CR ${monster.challenge_rating || 'Unknown'}) - Source: ${monster.document__slug ? monster.document__slug.toUpperCase() : 'No Source'}`;
+    resultDiv.classList.add('search-result');
+
+    // Store the monster data on the div element
+    resultDiv.monsterData = monster;
+
+    // Attach a click event listener to the result
+    resultDiv.addEventListener('click', () => {
+      selectResult(monster);
+    });
+
+    // Attach a return  event listener to the result
+    resultDiv.addEventListener('Enter', () => {
+      selectResult(monster);
+    });
+
+    resultsContainer.appendChild(resultDiv);
+  });
+}
+
 // Prioritize exact matches in the search results
 function prioritizeExactMatches(results, query) {
   const lowerCaseQuery = query.toLowerCase().trim();
@@ -138,35 +174,4 @@ export function selectResult(monsterOrElement) {
   resultsContainer.style.display = 'none';
 
   console.log(`Selected Monster: ${monster.name}, Source: ${monster.document__slug}`);
-}
-
-// Display search results in the UI and make them selectable
-export function displaySearchResults(results) {
-  const resultsContainer = document.getElementById('searchResults');
-  resultsContainer.innerHTML = '';  // Clear previous results
-
-  if (results.length === 0) {
-    resultsContainer.textContent = 'No monsters found.';
-    return;
-  }
-
-  // Show the results container
-  resultsContainer.style.display = 'block';
-
-  // Loop through the results and create a div for each monster
-  results.forEach(monster => {
-    const resultDiv = document.createElement('div');
-    resultDiv.textContent = `${monster.name} (CR ${monster.challenge_rating || 'Unknown'}) - Source: ${monster.document__slug ? monster.document__slug.toUpperCase() : 'No Source'}`;
-    resultDiv.classList.add('search-result');
-
-    // Store the monster data on the div element
-    resultDiv.monsterData = monster;
-
-    // Attach a click event listener to the result
-    resultDiv.addEventListener('click', () => {
-      selectResult(monster);
-    });
-
-    resultsContainer.appendChild(resultDiv);
-  });
 }
