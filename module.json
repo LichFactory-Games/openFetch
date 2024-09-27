@@ -1,7 +1,7 @@
 {
   "id": "openFetch",
   "title": "Open5e Fetch",
-  "version": "0.1",
+  "version": "0.2",
   "compatibility": {
     "minimum": "11",
     "verified": "12"
@@ -26,5 +26,6 @@
   ],
   "styles": [
     "styles/openFetch.css"
-  ]
+  ],
+  "download": "https://github.com/LichFactory-Games/openFetch/releases/download/v0.2/openFetch-v0.2.zip"
 }
