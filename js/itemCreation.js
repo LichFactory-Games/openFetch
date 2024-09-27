@@ -1,7 +1,11 @@
 import { calculateProficiencyBonus, abilityMapping } from "./monsterData.js";
-
+let iconData = {};  // Define a global variable to store icon data
 
 function normalizeText(text) {
+  // Remove content in parentheses and trim white space
+  text = text.replace(/\(.*?\)/g, '').trim();
+
+  // Normalize to lowercase and remove non-alphanumeric characters
   return text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '').trim();
 }
 
@@ -19,104 +23,6 @@ export async function ensureCreaturesFolder() {
     });
   }
   return folder;
-}
-
-export async function createItemsForActor(actor, monsterData) {
-  // Define the mapping of categories to item types and additional properties
-  const categories = {
-    actions: { type: 'feat', activationType: 'action' },
-    bonus_actions: { type: 'feat', activationType: 'bonus' },
-    reactions: { type: 'feat', activationType: 'reaction' },
-    legendary_actions: { type: 'feat', activationType: 'legendary' },
-    lair_actions: { type: 'feat', activationType: 'lair' },
-    special_abilities: { type: 'feat', activationType: '' } // May vary
-  };
-
-  // Keep track of created item names to avoid duplicates
-  const createdItemNames = new Set();
-
-  for (const [category, config] of Object.entries(categories)) {
-    const abilities = monsterData[category] || [];
-
-    for (const ability of abilities) {
-      const itemName = ability.name;
-
-      // Check for duplicates
-      if (createdItemNames.has(itemName)) {
-        console.log(`Skipping duplicate item: ${itemName}`);
-        continue;
-      }
-
-      // Mark this item as created
-      createdItemNames.add(itemName);
-
-      // Create the item
-      await createItem(actor, ability, config, monsterData);
-    }
-  }
-}
-
-
-async function fetchIcon(actionName, monsterName) {
-  console.log(`Searching for icon for action: ${actionName} of monster: ${monsterName}`);
-
-  // Step 1: Try to find a matching monster in the SRD
-  const monsterPack = game.packs.get('dnd5e.monsters');
-  if (monsterPack) {
-    const monsterIndex = await monsterPack.getIndex({ fields: ['name', 'items'] });
-    let matchingMonster = monsterIndex.find(m => normalizeText(m.name) === normalizeText(monsterName));
-
-    // If no exact match, try partial match
-    if (!matchingMonster) {
-      matchingMonster = monsterIndex.find(m =>
-        normalizeText(m.name).includes(normalizeText(monsterName)) ||
-          normalizeText(monsterName).includes(normalizeText(m.name))
-      );
-    }
-
-    if (matchingMonster) {
-      console.log(`Found matching monster in SRD: ${matchingMonster.name}`);
-
-      // Fetch the full monster data to access its items
-      const monster = await monsterPack.getDocument(matchingMonster._id);
-      const matchingItem = monster.items.find(item => normalizeText(item.name) === normalizeText(actionName));
-
-      if (matchingItem) {
-        console.log(`Found matching item: ${matchingItem.name}, Icon: ${matchingItem.img}`);
-        return matchingItem.img;
-      }
-    }
-  }
-
-  // Step 2: If no match in SRD monster, fall back to searching all compendiums
-  console.log("No match found in SRD monster, falling back to general search");
-  return fallbackIconSearch(actionName);
-}
-
-
-
-async function fallbackIconSearch(actionName) {
-  const normalizedActionName = normalizeText(actionName);
-  const relevantPacks = ['dnd5e.monsters', 'dnd5e.monsterfeatures', 'dnd5e.items', 'dnd5e.spells'];
-
-  for (const packKey of relevantPacks) {
-    const pack = game.packs.get(packKey);
-    if (pack) {
-      const index = await pack.getIndex({ fields: ['name', 'img'] });
-      let match = index.find(i => normalizeText(i.name) === normalizedActionName);
-      if (!match) {
-        match = index.find(i => normalizeText(i.name).includes(normalizedActionName) ||
-                           normalizedActionName.includes(normalizeText(i.name)));
-      }
-      if (match) {
-        console.log(`Found icon in ${packKey}: ${match.img}`);
-        return match.img;
-      }
-    }
-  }
-
-  console.log(`No icon found for ${actionName}, using default`);
-  return "modules/openFetch/icons/default-icon.webp";
 }
 
 function calculateAttackBonus(action, monsterData) {
@@ -175,100 +81,6 @@ function parseDamage(action) {
   }
 
   return { attackType, ability, damageParts, saveData };
-}
-
-async function createItem(actor, action, config, monsterData) {
-  console.log("DEBUG: Monster data before creating items:", monsterData);
-  const itemType = config.type || 'feat';
-  const activationType = config.activationType || '';
-  const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
-  let description = handleSpellcasting(action, action.desc || '');
-  const icon = await fetchIcon(action.name, monsterData.name);
-  const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(action);
-  const additionalProperties = getAdditionalProperties(config, action);
-
-  const newItem = {
-    name: action.name,
-    type: itemType,
-    img: icon,
-    system: {
-      description: {
-        value: description,
-        chat: description,
-        enrichedText: true
-      },
-      activation: additionalProperties.activation || {
-        type: activationType,
-        cost: activationType ? 1 : null,
-        condition: ""
-      },
-      target: {
-        value: "1",
-        type: "creature",
-        units: "",
-        prompt: true
-      },
-      range: {
-        value: action.range?.value || 5,
-        long: action.range?.long || null,
-        units: action.range?.units || "ft"
-      },
-      damage: {
-        parts: damageParts,
-        versatile: ""
-      },
-      ability: attackAbility,
-      actionType: saveData ? "save" : attackType,
-      attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
-      proficient: true,
-      save: saveData ? {
-        ability: saveData.ability,
-        dc: saveData.dc,
-        scaling: "flat"
-      } : null,
-      ...additionalProperties
-    }
-  };
-
-  if (saveData) {
-    newItem.system.ability = saveData.ability;
-  }
-
-  // Merge any additional properties
-  Object.assign(newItem.system, additionalProperties);
-
-  await actor.createEmbeddedDocuments('Item', [newItem]);
-  console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
-}
-
-function getAdditionalProperties(config, action) {
-  const properties = {};
-
-  // Set properties for specific activation types
-  if (config.activationType === 'legendary') {
-    properties.activation = {
-      type: 'legendary',
-      cost: 1,
-      condition: ""
-    };
-  } else if (config.activationType === 'lair') {
-    properties.activation = {
-      type: 'lair',
-      cost: 1,
-      condition: ""
-    };
-  } else if (config.activationType) {
-    properties.activation = {
-      type: config.activationType,
-      cost: 1,
-      condition: ""
-    };
-  }
-
-  // Add any other properties you need based on the action data
-  // For example, handling recharge, consumables, etc.
-
-  return properties;
 }
 
 function handleSpellcasting(action, description) {
@@ -357,4 +169,225 @@ export function formatDynamicSpellcastingDescription(spellcastingDetails) {
 
   description += '</p>';
   return description;
+}
+
+//// Create icon map file
+
+async function fetchAllMonsterItems() {
+  const compendiaList = [
+    'dnd5e.monsterfeatures', // Monster abilities
+    'dnd5e.monsters',        // Monsters
+    'dnd5e.items',           // Items
+    'dnd5e.spells'           // Spells
+  ];
+
+  const monsterItemIcons = {};
+
+  for (const compendiumName of compendiaList) {
+    const compendium = game.packs.get(compendiumName);
+    if (!compendium) {
+      console.warn(`Compendium ${compendiumName} not found, skipping...`);
+      continue;
+    }
+
+    const index = await compendium.getIndex({ fields: ['name', 'img'] });
+    for (const item of index) {
+      const normalizedName = normalizeText(item.name);
+      monsterItemIcons[normalizedName] = item.img || "icons/svg/mystery-man.svg";
+    }
+  }
+
+  console.log("Monster item icons fetched:", monsterItemIcons);
+  return monsterItemIcons;
+}
+
+async function saveIconDataToFile(iconData) {
+  const json = JSON.stringify(iconData, null, 2); // Pretty print JSON
+  const blob = new Blob([json], { type: 'application/json' });
+  const fileName = 'monster-icons.json';
+
+  // Use FilePicker to save the generated file
+  const filePicker = new FilePicker({
+    type: 'data',
+    current: 'modules/openFetch/icons/',
+    callback: (path) => console.log(`Icon data saved at ${path}`),
+  });
+
+  // Automatically trigger the download
+  await filePicker.upload('data', 'modules/openFetch/icons/', blob, { filename: fileName });
+  ui.notifications.info("Monster icon data generated. Please check and upload it to the correct directory.");
+}
+////
+
+//// Fetch item icons
+async function loadIconDataFromFile() {
+  const path = 'modules/openFetch/icons/monster-icons.json';
+
+  try {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error('File not found');
+    const iconData = await response.json();
+    console.log('Icon data loaded from file:', iconData);
+    return iconData;
+  } catch (err) {
+    console.warn('Error loading icon data from file:', err);
+    return null; // Return null if the file doesn't exist
+  }
+}
+
+function fetchIconFromStoredData(actionName, iconData) {
+  if (!actionName) {
+    console.warn('Action name is undefined');
+    return "modules/openFetch/icons/default-icon.webp"; // Fallback to default icon
+  }
+
+  const normalizedAction = normalizeText(actionName);
+  console.log(`Fetching icon for normalized action: ${normalizedAction}`);
+  console.log("Available icon data: ", iconData); // Log the iconData to ensure multiattack is present
+
+  return iconData[normalizedAction] || "modules/openFetch/icons/default-icon.webp"; // Fallback to default icon
+}
+
+// Ready hook to load or generate icon data
+Hooks.once('ready', async function () {
+  try {
+    // Load icon data from the file
+    iconData = await loadIconDataFromFile();
+    console.log("Monster item icon data loaded successfully:", iconData);
+  } catch (err) {
+    console.warn("No monster icon data found. Creating new icon data...");
+    iconData = await fetchAllMonsterItems();
+    await saveIconDataToFile(iconData);
+    console.log("New monster icon data created and saved:", iconData);
+  }
+});
+
+
+async function createItem(actor, action, config, monsterData) {
+  console.log("openFetch: Monster data before creating items:", monsterData);
+  const itemType = config.type || 'feat';
+  const activationType = config.activationType || '';
+  const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
+  let description = handleSpellcasting(action, action.desc || '');
+  const icon = fetchIconFromStoredData(action.name, iconData);
+  const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(action);
+  const additionalProperties = getAdditionalProperties(config, action);
+
+  const newItem = {
+    name: action.name,
+    type: itemType,
+    img: icon,
+    system: {
+      description: {
+        value: description,
+        chat: description,
+        enrichedText: true
+      },
+      activation: additionalProperties.activation || {
+        type: activationType,
+        cost: activationType ? 1 : null,
+        condition: ""
+      },
+      target: {
+        value: "1",
+        type: "creature",
+        units: "",
+        prompt: true
+      },
+      range: {
+        value: action.range?.value || 5,
+        long: action.range?.long || null,
+        units: action.range?.units || "ft"
+      },
+      damage: {
+        parts: damageParts,
+        versatile: ""
+      },
+      ability: attackAbility,
+      actionType: saveData ? "save" : attackType,
+      attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
+      proficient: true,
+      save: saveData ? {
+        ability: saveData.ability,
+        dc: saveData.dc,
+        scaling: "flat"
+      } : null,
+      ...additionalProperties
+    }
+  };
+
+  if (saveData) {
+    newItem.system.ability = saveData.ability;
+  }
+
+  // Merge any additional properties
+  Object.assign(newItem.system, additionalProperties);
+
+  await actor.createEmbeddedDocuments('Item', [newItem]);
+  console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
+}
+
+function getAdditionalProperties(config, action) {
+  const properties = {};
+
+  // Set properties for specific activation types
+  if (config.activationType === 'legendary') {
+    properties.activation = {
+      type: 'legendary',
+      cost: 1,
+      condition: ""
+    };
+  } else if (config.activationType === 'lair') {
+    properties.activation = {
+      type: 'lair',
+      cost: 1,
+      condition: ""
+    };
+  } else if (config.activationType) {
+    properties.activation = {
+      type: config.activationType,
+      cost: 1,
+      condition: ""
+    };
+  }
+
+  // Add any other properties you need based on the action data
+  // For example, handling recharge, consumables, etc.
+
+  return properties;
+}
+
+export async function createItemsForActor(actor, monsterData) {
+  // Define the mapping of categories to item types and additional properties
+  const categories = {
+    actions: { type: 'feat', activationType: 'action' },
+    bonus_actions: { type: 'feat', activationType: 'bonus' },
+    reactions: { type: 'feat', activationType: 'reaction' },
+    legendary_actions: { type: 'feat', activationType: 'legendary' },
+    lair_actions: { type: 'feat', activationType: 'lair' },
+    special_abilities: { type: 'feat', activationType: '' } // May vary
+  };
+
+  // Keep track of created item names to avoid duplicates
+  const createdItemNames = new Set();
+
+  for (const [category, config] of Object.entries(categories)) {
+    const abilities = monsterData[category] || [];
+
+    for (const ability of abilities) {
+      const itemName = ability.name;
+
+      // Check for duplicates
+      if (createdItemNames.has(itemName)) {
+        console.log(`Skipping duplicate item: ${itemName}`);
+        continue;
+      }
+
+      // Mark this item as created
+      createdItemNames.add(itemName);
+
+      // Create the item
+      await createItem(actor, ability, config, monsterData);
+    }
+  }
 }
