@@ -29,14 +29,6 @@ openFetch is a module for Foundry VTT that enhances the monster importing proces
 3. Use arrow keys to navigate through the search results, or click on a result to select it.
 4. Press Enter or click the "Fetch" button to import the selected monster into your game.
 
-## Configuration
-
-openFetch can be configured in the module settings. You can customize:
-
-- Default compendiums to search
-- Icon assignment rules for monster abilities
-- [Add any other configurable options here]
-
 ## Contributing
 
 Contributions to openFetch are welcome! Please refer to our [Contributing Guidelines](CONTRIBUTING.md) for more information on how to submit pull requests, report issues, or suggest enhancements.
@@ -47,7 +39,7 @@ GNU GENERAL PUBLIC LICENSE v.3
 
 ## Support
 
-If you encounter any issues or have questions about openFetch, please [file an issue](https://github.com/[your-username]/openFetch/issues) on our GitHub repository.
+If you encounter any issues or have questions about openFetch, please [file an issue](https://github.com/LichFactory-Games/openFetch/issues) on our GitHub repository.
 
 ## Acknowledgements
 
