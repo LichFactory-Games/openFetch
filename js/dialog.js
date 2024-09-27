@@ -103,7 +103,7 @@ export class MonsterSearchDialog extends Dialog {
 
       if (monsterNameInput && monsterNameInput.value) {
         // If a monster is selected (monsterName is populated), trigger the fetch
-        this.handleFetch();
+        this.handleFetch(this.element);
         return;
       } else if (resultsContainer && resultsContainer.children.length) {
         // If no monster is selected yet, but there are search results, select the active one
