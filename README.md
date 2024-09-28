@@ -2,10 +2,6 @@
 
 openFetch is a tool to import monsters (and maybe eventually other things...) from the [open5e website](https://open5e.com). 
 
-# openFetch
-
-openFetch is a module for Foundry VTT that enhances the monster importing process by allowing users to search and fetch monster data from various sources.
-
 ## Features
 
 - Fetch and import monster data into your game
