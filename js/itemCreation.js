@@ -265,28 +265,50 @@ Hooks.once('ready', async function () {
   }
 });
 
-
-async function createItem(actor, action, config, monsterData) {
-  console.log("openFetch: Monster data before creating items:", monsterData);
+async function createItem(actor, ability, config, monsterData) {
   const itemType = config.type || 'feat';
-  const activationType = config.activationType || '';
-  const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
-  let description = handleSpellcasting(action, action.desc || '');
-  const icon = fetchIconFromStoredData(action.name, iconData);
-  const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(action);
-  const additionalProperties = getAdditionalProperties(config, action);
+
+  // Set up activation type based on category
+  let activationType = '';
+  let consumption = [];
+
+  switch(config.category) {
+  case 'Features':
+    activationType = null;
+    break;
+  case 'Special':
+    activationType = 'special';
+    break;
+  case 'Action':
+    activationType = 'action';
+    break;
+  case 'Legendary Action':
+    activationType = 'legendary';
+    consumption = [{
+      type: "attribute",
+      target: "resources.legact.value",
+      value: "1"
+    }];
+    break;
+  }
+
+  const { itemAttackBonus } = calculateAttackBonus(ability, monsterData);
+  let description = handleSpellcasting(ability, ability.desc || '');
+  const icon = fetchIconFromStoredData(ability.name, iconData);
+  const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(ability);
 
   const newItem = {
-    name: action.name,
+    name: ability.name,
     type: itemType,
     img: icon,
+    sort: config.sort || 0,
     system: {
       description: {
         value: description,
         chat: description,
         enrichedText: true
       },
-      activation: additionalProperties.activation || {
+      activation: {
         type: activationType,
         cost: activationType ? 1 : null,
         condition: ""
@@ -298,15 +320,15 @@ async function createItem(actor, action, config, monsterData) {
         prompt: true
       },
       range: {
-        value: action.range?.value || 5,
-        long: action.range?.long || null,
-        units: action.range?.units || "ft"
+        value: ability.range?.value || 5,
+        long: ability.range?.long || null,
+        units: ability.range?.units || "ft"
       },
       damage: {
         parts: damageParts,
         versatile: ""
       },
-      ability: attackAbility,
+      ability: saveData ? saveData.ability : attackAbility,
       actionType: saveData ? "save" : attackType,
       attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
       proficient: true,
@@ -315,20 +337,172 @@ async function createItem(actor, action, config, monsterData) {
         dc: saveData.dc,
         scaling: "flat"
       } : null,
-      ...additionalProperties
+      activities: {
+        dnd5eactivity000: {
+          _id: "dnd5eactivity000",
+          type: itemType === 'weapon' ? 'attack' : 'utility',
+          activation: {
+            type: activationType,
+            value: activationType ? 1 : null,
+            condition: "",
+            override: false
+          },
+          consumption: {
+            targets: consumption,
+            scaling: {
+              allowed: false,
+              max: ""
+            },
+            spellSlot: true
+          },
+          description: {
+            chatFlavor: ""
+          },
+          duration: {
+            concentration: false,
+            value: "",
+            units: "",
+            special: "",
+            override: false
+          },
+          effects: [],
+          range: {
+            units: "",
+            special: "",
+            override: false
+          },
+          target: {
+            template: {
+              count: "",
+              contiguous: false,
+              type: "",
+              size: "",
+              width: "",
+              height: "",
+              units: ""
+            },
+            affects: {
+              count: "",
+              type: "",
+              choice: false,
+              special: ""
+            },
+            prompt: true,
+            override: false
+          },
+          uses: {
+            spent: 0,
+            max: "",
+            recovery: []
+          },
+          damage: saveData ? {
+            onSave: "half",
+            parts: []
+          } : {
+            critical: {
+              bonus: ""
+            },
+            includeBase: true,
+            parts: []
+          },
+          sort: 0
+        }
+      }
+    },
+    flags: {
+      openFetch: {
+        category: config.category
+      }
     }
   };
 
-  if (saveData) {
-    newItem.system.ability = saveData.ability;
+  if (itemType === 'weapon') {
+    newItem.system.quantity = 1;
+    newItem.system.weight = { value: 0, units: "lb" };
+    newItem.system.price = { value: 0, denomination: "gp" };
+    newItem.system.attunement = "";
+    newItem.system.equipped = true;
+    newItem.system.rarity = "";
+    newItem.system.identified = true;
+    newItem.system.armor = { value: 10 };
+    newItem.system.hp = { value: 0, max: 0, dt: null, conditions: "" };
+    newItem.system.properties = [];
+    newItem.system.proficient = 1;
+    newItem.system.unidentified = { description: "" };
+    newItem.system.container = null;
+    newItem.system.crewed = false;
+    newItem.system.attuned = false;
+    newItem.system.magicalBonus = null;
+    newItem.system.type = { value: "natural", baseItem: "" };
+    newItem.system.ammunition = {};
   }
 
-  // Merge any additional properties
-  Object.assign(newItem.system, additionalProperties);
-
   await actor.createEmbeddedDocuments('Item', [newItem]);
-  console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
 }
+
+// async function createItem(actor, action, config, monsterData) {
+//   console.log("openFetch: Monster data before creating items:", monsterData);
+//   const itemType = config.type || 'feat';
+//   const activationType = config.activationType || '';
+//   const { itemAttackBonus } = calculateAttackBonus(action, monsterData);
+//   let description = handleSpellcasting(action, action.desc || '');
+//   const icon = fetchIconFromStoredData(action.name, iconData);
+//   const { attackType, ability: attackAbility, damageParts, saveData } = parseDamage(action);
+//   const additionalProperties = getAdditionalProperties(config, action);
+
+//   const newItem = {
+//     name: action.name,
+//     type: itemType,
+//     img: icon,
+//     system: {
+//       description: {
+//         value: description,
+//         chat: description,
+//         enrichedText: true
+//       },
+//       activation: additionalProperties.activation || {
+//         type: activationType,
+//         cost: activationType ? 1 : null,
+//         condition: ""
+//       },
+//       target: {
+//         value: "1",
+//         type: "creature",
+//         units: "",
+//         prompt: true
+//       },
+//       range: {
+//         value: action.range?.value || 5,
+//         long: action.range?.long || null,
+//         units: action.range?.units || "ft"
+//       },
+//       damage: {
+//         parts: damageParts,
+//         versatile: ""
+//       },
+//       ability: attackAbility,
+//       actionType: saveData ? "save" : attackType,
+//       attackBonus: itemAttackBonus !== null ? `${itemAttackBonus}` : null,
+//       proficient: true,
+//       save: saveData ? {
+//         ability: saveData.ability,
+//         dc: saveData.dc,
+//         scaling: "flat"
+//       } : null,
+//       ...additionalProperties
+//     }
+//   };
+
+//   if (saveData) {
+//     newItem.system.ability = saveData.ability;
+//   }
+
+//   // Merge any additional properties
+//   Object.assign(newItem.system, additionalProperties);
+
+//   await actor.createEmbeddedDocuments('Item', [newItem]);
+//   console.log(`Created ${activationType || 'special ability'} item: ${action.name}`);
+// }
 
 function getAdditionalProperties(config, action) {
   const properties = {};
@@ -360,49 +534,122 @@ function getAdditionalProperties(config, action) {
   return properties;
 }
 
+// Helper function for determining item type
+function determineActionType(action) {
+  if (action.attack_bonus !== undefined ||
+      (action.desc || '').toLowerCase().match(/\b(melee|ranged)\b.*\battack\b/i)) {
+    return 'weapon';
+  }
+  return 'feat';
+}
+
+
+// Actor Items
 export async function createItemsForActor(actor, monsterData) {
-  // Define the mapping of categories to item types and additional properties
-  const categories = {
-    actions: { type: 'feat', activationType: 'action' },
-    bonus_actions: { type: 'feat', activationType: 'bonus' },
-    reactions: { type: 'feat', activationType: 'reaction' },
-    legendary_actions: { type: 'feat', activationType: 'legendary' },
-    lair_actions: { type: 'feat', activationType: 'lair' },
-    special_abilities: { type: 'feat', activationType: '' }
+  const createdItemNames = new Set();
+  const itemsByCategory = {
+    'Features': [],      // For descriptive features (legendary_desc, etc)
+    'Special': [],       // For special_abilities
+    'Action': [],        // For actions
+    'Legendary Action': [] // For legendary_actions
   };
 
-  // Process special abilities first
-  const processedAbilities = processSpecialAbilities(monsterData.special_abilities);
-
-  // Keep track of created item names to avoid duplicates
-  const createdItemNames = new Set();
-
-  // Create items from processed special abilities
-  for (const ability of processedAbilities) {
-    if (createdItemNames.has(ability.name)) continue;
-
-    createdItemNames.add(ability.name);
-
-    // Adjust config based on ability type
-    const config = {
-      type: 'feat',
-      activationType: ability.type === 'save' ? 'action' : ''
-    };
-
-    await createItem(actor, {
-      name: ability.name,
-      desc: ability.description
-    }, config, monsterData);
+  // Descriptive features
+  if (monsterData.legendary_desc) {
+    itemsByCategory['Features'].push({
+      ability: {
+        name: "Legendary Actions",
+        desc: monsterData.legendary_desc
+      },
+      config: {
+        type: 'feat',
+        category: 'Features',
+        sort: 0
+      }
+    });
   }
 
-  // Create remaining items as before
-  for (const [category, config] of Object.entries(categories)) {
-    const abilities = monsterData[category] || [];
+  if (monsterData.lair_desc) {
+    itemsByCategory['Features'].push({
+      ability: {
+        name: "Lair Actions",
+        desc: monsterData.lair_desc
+      },
+      config: {
+        type: 'feat',
+        category: 'Features',
+        sort: 0
+      }
+    });
+  }
 
-    for (const ability of abilities) {
+  if (monsterData.regional_desc) {
+    itemsByCategory['Features'].push({
+      ability: {
+        name: "Regional Effects",
+        desc: monsterData.regional_desc
+      },
+      config: {
+        type: 'feat',
+        category: 'Features',
+        sort: 0
+      }
+    });
+  }
+
+  // Special abilities
+  if (monsterData.special_abilities) {
+    for (const ability of monsterData.special_abilities) {
       if (createdItemNames.has(ability.name)) continue;
+      itemsByCategory['Special'].push({
+        ability,
+        config: {
+          type: 'feat',
+          category: 'Special',
+          activationType: 'special'
+        }
+      });
       createdItemNames.add(ability.name);
-      await createItem(actor, ability, config, monsterData);
+    }
+  }
+
+  // Actions
+  if (monsterData.actions) {
+    for (const action of monsterData.actions) {
+      if (createdItemNames.has(action.name)) continue;
+      itemsByCategory['Action'].push({
+        ability: action,
+        config: {
+          type: determineActionType(action),
+          category: 'Action',
+          activationType: 'action'
+        }
+      });
+      createdItemNames.add(action.name);
+    }
+  }
+
+  // Legendary Actions
+  if (monsterData.legendary_actions) {
+    for (const action of monsterData.legendary_actions) {
+      if (createdItemNames.has(action.name)) continue;
+      itemsByCategory['Legendary Action'].push({
+        ability: action,
+        config: {
+          type: determineActionType(action),
+          category: 'Legendary Action',
+          activationType: 'legendary'
+        }
+      });
+      createdItemNames.add(action.name);
+    }
+  }
+
+  // Create items in Foundry's order
+  for (const category of ['Features', 'Special', 'Action', 'Legendary Action']) {
+    const items = itemsByCategory[category];
+    for (const item of items) {
+      await createItem(actor, item.ability, item.config, monsterData);
     }
   }
 }
