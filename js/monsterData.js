@@ -420,45 +420,36 @@ export function parseLanguages(languages) {
   return languageData;
 }
 
-function parseSenses(senses) {
-  console.log("Original senses data:", senses);  // Log the input to see what is being processed
-
-  // Initialize with null or default values as per Foundry VTT requirements
-  const senseData = {
-    darkvision: null,
-    blindsight: null,
-    tremorsense: null,
-    truesight: null,
-    'passive perception': null  // Treat passive Perception as a special case if needed
+function parseSenses(sensesString) {
+  const senses = {
+    darkvision: 0,
+    blindsight: 0,
+    tremorsense: 0,
+    truesight: 0,
+    special: ''
   };
 
-  if (!senses) {
-    console.log("No senses data provided");
-    return senseData;
-  }
+  if (!sensesString) return senses;
 
-  // Regex to match each type of sense and extract the numeric value
-  const senseRegex = /(\w+)\s(\d+)\sft\.|passive perception (\d+)/g;
-  let match;
+  // Split on commas and process each sense
+  sensesString.split(',').forEach(sense => {
+    sense = sense.toLowerCase().trim();
 
-  while ((match = senseRegex.exec(senses)) !== null) {
-    if (match[1] && match[2]) {
-      // Map senses like "darkvision 60 ft."
-      const senseType = match[1].toLowerCase();
-      const senseValue = parseInt(match[2], 10);
-      if (senseData.hasOwnProperty(senseType)) {
-        senseData[senseType] = senseValue;
-        console.log(`Parsed ${senseType}: ${senseValue} ft.`);
+    // Extract numeric values and units
+    const match = sense.match(/(\w+)\s+(\d+)\s*(?:ft|feet)?\.?/i);
+    if (match) {
+      const [_, type, range] = match;
+      if (senses.hasOwnProperty(type)) {
+        senses[type] = parseInt(range);
       }
-    } else if (match[3]) {
-      // Handle "passive Perception 9"
-      senseData['passive Perception'] = parseInt(match[3], 10);
-      console.log(`Parsed passive Perception: ${match[3]}`);
     }
-  }
+    // Handle special senses
+    else if (!sense.includes('passive')) {
+      senses.special += (senses.special ? ', ' : '') + sense;
+    }
+  });
 
-  console.log("Parsed senses data:", senseData);
-  return senseData;
+  return senses;
 }
 
 export function extractResources(monsterData) {
