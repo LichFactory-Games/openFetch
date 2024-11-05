@@ -268,15 +268,22 @@ function capitalizeFirstLetter(string) {
 }
 
 function parseCR(crString) {
-  if (!crString || crString.trim() === "") return 1; // Default CR
-  if (crString.includes("/")) {
-    const [numerator, denominator] = crString.split("/").map(Number);
+  if (!crString || typeof crString !== 'string') return 0;
+
+  crString = crString.trim();
+  if (crString === '') return 0;
+
+  // Handle fractions
+  if (crString.includes('/')) {
+    const [numerator, denominator] = crString.split('/').map(Number);
     return numerator / denominator;
-  } else {
-    const crNumber = Number(crString);
-    return isNaN(crNumber) ? 1 : crNumber;
   }
+
+  // Handle numeric values
+  const cr = Number(crString);
+  return isNaN(cr) ? 0 : cr;
 }
+
 /////
 
 
