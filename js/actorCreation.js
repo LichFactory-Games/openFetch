@@ -1,41 +1,46 @@
 import { ensureCreaturesFolder, createItemsForActor } from './itemCreation.js';
 import { mapSize, mapAbilities, mapAttributes, mapDetails, mapSavingThrows, mapSkills, mapTraitData, mapImage, extractResources, extractBonuses } from './monsterData.js';
 
+
 export async function createFoundryActor(monsterData) {
-  const folder = await ensureCreaturesFolder();
-  const monsterImage = await mapImage(monsterData.name);
+  try {
+    // Validate required fields
+    const requiredFields = ['name', 'type', 'size', 'alignment'];
+    const missingFields = requiredFields.filter(field => !monsterData[field]);
 
-  // Map abilities
-  const abilities = mapAbilities(monsterData);
-
-  // Update abilities with saving throws
-  mapSavingThrows(monsterData, abilities); // Modifies abilities in-place
-
-  const actorData = {
-    name: monsterData.name,
-    type: "npc",
-    folder: folder.id,
-    img: monsterImage || "icons/svg/mystery-man.svg",
-    system: {
-      abilities: abilities, // Use the updated abilities object
-      attributes: mapAttributes(monsterData),
-      details: mapDetails(monsterData),
-      traits: {
-        ...mapTraitData(monsterData),
-        size: mapSize(monsterData.size)
-      },
-      skills: mapSkills(monsterData),
-      bonuses: extractBonuses(monsterData),
-      resources: extractResources(monsterData)
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
-  };
 
-  const actor = await Actor.create(actorData);
-  await createItemsForActor(actor, monsterData);
+    const folder = await ensureCreaturesFolder();
+    const monsterImage = await mapImage(monsterData.name);
 
-  ui.notifications.notify(`${actor.name} successfully fetched!`, 'success');
+    // Map data with fallbacks
+    const actorData = {
+      name: monsterData.name,
+      type: "npc",
+      folder: folder.id,
+      img: monsterImage || "icons/svg/mystery-man.svg",
+      system: {
+        abilities: mapAbilities(monsterData) || getDefaultAbilities(),
+        attributes: mapAttributes(monsterData) || getDefaultAttributes(),
+        details: mapDetails(monsterData) || getDefaultDetails(),
+        traits: {
+          ...mapTraitData(monsterData),
+          size: mapSize(monsterData.size)
+        },
+        skills: mapSkills(monsterData) || {},
+      }
+    };
 
-  console.log(`Actor created: ${actor.name}`);
-  return actor;
+    const actor = await Actor.create(actorData);
+    await createItemsForActor(actor, monsterData);
 
+    return actor;
+
+  } catch (error) {
+    console.error('Error creating actor:', error);
+    ui.notifications.error(`Failed to create ${monsterData.name}: ${error.message}`);
+    throw error;
+  }
 }
