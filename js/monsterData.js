@@ -376,13 +376,35 @@ export function calculateProficiencyBonus(challengeRating) {
 }
 /////
 
+function mapMovement(speed) {
+  const movement = {
+    walk: 0,
+    swim: 0,
+    fly: 0,
+    climb: 0,
+    burrow: 0
+  };
 
-
-export function mapMovement(speed) {
-  const movement = {};
-  for (let type in speed) {
-    movement[type] = speed[type];
+  // Handle string format ("walk 30 ft.")
+  if (typeof speed === 'string') {
+    const parts = speed.toLowerCase().split(',');
+    parts.forEach(part => {
+      const match = part.match(/(\w+)\s+(\d+)/);
+      if (match && movement.hasOwnProperty(match[1])) {
+        movement[match[1]] = parseInt(match[2]);
+      }
+    });
   }
+  // Handle object format ({walk: 30, swim: 20})
+  else if (typeof speed === 'object' && speed !== null) {
+    Object.entries(speed).forEach(([type, value]) => {
+      if (movement.hasOwnProperty(type)) {
+        movement[type] = typeof value === 'string' ?
+          parseInt(value.replace(/\D/g, '')) : value;
+      }
+    });
+  }
+
   return movement;
 }
 
