@@ -106,6 +106,37 @@ export function mapAbilities(monsterData) {
   return abilities;
 }
 
+export function processSpecialAbilities(abilities) {
+  if (!Array.isArray(abilities)) return [];
+
+  return abilities.map(ability => {
+    // Clean up description
+    let description = ability.desc
+        .replace(/([._])\s*\n/g, '$1 ') // Fix broken lines
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+
+    // Extract any numeric values that might be important
+    const numbers = description.match(/\d+/g) || [];
+
+    return {
+      name: ability.name.trim(),
+      description: description,
+      type: determineAbilityType(ability.name, description),
+      values: numbers.map(Number)
+    };
+  });
+}
+
+function determineAbilityType(name, desc) {
+  name = name.toLowerCase();
+  if (name.includes('resistance')) return 'resistance';
+  if (name.includes('immunity')) return 'immunity';
+  if (name.includes('vulnerability')) return 'vulnerability';
+  if (desc.includes('DC')) return 'save';
+  return 'feature';
+}
+
 export function mapSavingThrows(monsterData, abilities) {
   const proficiencyBonus = calculateProficiencyBonus(monsterData.challenge_rating);
 

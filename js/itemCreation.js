@@ -1,4 +1,7 @@
 import { calculateProficiencyBonus, abilityMapping } from "./monsterData.js";
+import { processSpecialAbilities } from './monsterData.js';
+
+
 let iconData = {};  // Define a global variable to store icon data
 
 function normalizeText(text) {
@@ -365,28 +368,40 @@ export async function createItemsForActor(actor, monsterData) {
     reactions: { type: 'feat', activationType: 'reaction' },
     legendary_actions: { type: 'feat', activationType: 'legendary' },
     lair_actions: { type: 'feat', activationType: 'lair' },
-    special_abilities: { type: 'feat', activationType: '' } // May vary
+    special_abilities: { type: 'feat', activationType: '' }
   };
+
+  // Process special abilities first
+  const processedAbilities = processSpecialAbilities(monsterData.special_abilities);
 
   // Keep track of created item names to avoid duplicates
   const createdItemNames = new Set();
 
+  // Create items from processed special abilities
+  for (const ability of processedAbilities) {
+    if (createdItemNames.has(ability.name)) continue;
+
+    createdItemNames.add(ability.name);
+
+    // Adjust config based on ability type
+    const config = {
+      type: 'feat',
+      activationType: ability.type === 'save' ? 'action' : ''
+    };
+
+    await createItem(actor, {
+      name: ability.name,
+      desc: ability.description
+    }, config, monsterData);
+  }
+
+  // Create remaining items as before
   for (const [category, config] of Object.entries(categories)) {
     const abilities = monsterData[category] || [];
 
     for (const ability of abilities) {
-      const itemName = ability.name;
-
-      // Check for duplicates
-      if (createdItemNames.has(itemName)) {
-        console.log(`Skipping duplicate item: ${itemName}`);
-        continue;
-      }
-
-      // Mark this item as created
-      createdItemNames.add(itemName);
-
-      // Create the item
+      if (createdItemNames.has(ability.name)) continue;
+      createdItemNames.add(ability.name);
       await createItem(actor, ability, config, monsterData);
     }
   }
