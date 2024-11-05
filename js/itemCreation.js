@@ -47,12 +47,13 @@ function calculateAttackBonus(action, monsterData) {
 
 function parseDamage(action) {
   const attackRegex = /(Melee|Ranged) Weapon Attack: \+(\d+) to hit/;
-  const damageRegex = /(\d+d\d+\s*(?:\+\s*\d+)?)(?:\s+([a-z]+))?/gi;
+  const damageRegex = /(\d+)d(\d+)\s*(?:\+\s*(\d+))?/i;  // Modified to capture dice and bonus separately
   const saveRegex = /DC\s+(\d+)\s+([A-Za-z]+)(?:\s+saving throw)/i;
 
   const attackParts = attackRegex.exec(action.desc);
   let attackType = "other";
   let ability = "default";
+
   if (attackParts) {
     attackType = attackParts[1].toLowerCase() === "melee" ? "mwak" : "rwak";
     ability = attackType === "mwak" ? "str" : "dex";
@@ -60,17 +61,22 @@ function parseDamage(action) {
 
   const damageParts = [];
   const splitDamageParts = action.desc.split(" plus ");
+
   splitDamageParts.forEach(part => {
-    let match;
-    while ((match = damageRegex.exec(part)) !== null) {
-      let formula = match[1].trim();
-      let type = match[2] ? match[2].trim() : "";
-      if (!type) {
-        type = Object.keys(CONFIG.DND5E.damageTypes).find(dt => part.toLowerCase().includes(dt)) || "";
+    // Look for damage expressions like "12 (2d8 + 3)"
+    const fullDamageMatch = part.match(/\d+\s*\((\d+d\d+)\s*(?:\+\s*\d+)?\)/);
+    if (fullDamageMatch) {
+      // Use just the dice without the modifier since Foundry will add it
+      const diceOnly = fullDamageMatch[1];
+
+      // Get damage type
+      let type = "";
+      const typeMatch = part.match(/\b(acid|bludgeoning|cold|fire|force|lightning|necrotic|piercing|poison|psychic|radiant|slashing|thunder)\b/i);
+      if (typeMatch) {
+        type = typeMatch[1].toLowerCase();
       }
-      if (formula) {
-        damageParts.push([formula, type]);
-      }
+
+      damageParts.push([diceOnly, type]);
     }
   });
 
