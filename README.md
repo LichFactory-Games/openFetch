@@ -13,7 +13,7 @@ openFetch is a tool to import monsters (and maybe eventually other things...) fr
 ## Installation
 
 1. Inside Foundry VTT, navigate to the "Add-on Modules" tab in the Configuration and Setup menu.
-2. Click the "Install Module" button and enter the following URL: https://github.com/LichFactory-Games/openFetch/releases/latest/module.json
+2. Click the "Install Module" button and enter the following URL: https://raw.githubusercontent.com/LichFactory-Games/openFetch/refs/heads/main/module.json
 
 3. Click "Install" and wait for installation to complete.
 4. Activate the module in your world's Modules Configuration.
