@@ -1,7 +1,7 @@
 {
   "id": "openFetch",
   "title": "openFetch",
-  "version": "0.2\u007f\u0002\u0002",
+  "version": "0.3",
   "compatibility": {
     "minimum": "11",
     "verified": "12"
@@ -9,7 +9,7 @@
   "description": "A module to fetch monsters from Open5e",
   "url": "https://github.com/LichFactory-Games/openFetch",
   "manifest": "https://raw.githubusercontent.com/LichFactory-Games/openFetch/refs/heads/main/module.json",
-  "download": "https://github.com/LichFactory-Games/openFetch/releases/download/v0.2\u007f\u0002\u0002/openFetch-v0.2\u007f\u0002\u0002.zip",
+  "download": "https://github.com/LichFactory-Games/openFetch/releases/download/v0.3/openFetch-v0.3.zip",
   "authors": [
     {
       "name": "LichLife"
