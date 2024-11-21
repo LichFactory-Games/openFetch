@@ -3,6 +3,8 @@ import { state } from './state.js'; // Import shared state
 
 
 let searchTimeout = null;  // For debouncing the search input
+const DEBOUNCE_MS = 300;
+
 
 // Handle fetching the monster data after a search
 export async function handleFetch(html) {
@@ -22,7 +24,22 @@ export async function handleFetch(html) {
 
 // Handle search input with debounce
 export async function handleSearchInput(value) {
-  clearTimeout(searchTimeout);
+  // Clear any pending search
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+
+  // Don't search for very short terms immediately
+  if (value.trim().length < 3) {
+    const resultsContainer = document.getElementById('searchResults');
+    if (value.trim().length === 0) {
+      resultsContainer.innerHTML = 'Type to search...';
+    } else {
+      resultsContainer.innerHTML = 'Enter at least 3 characters...';
+    }
+    return;
+  }
+
   searchTimeout = setTimeout(async () => {
     const resultsContainer = document.getElementById('searchResults');
     resultsContainer.innerHTML = 'Searching...';
@@ -31,65 +48,123 @@ export async function handleSearchInput(value) {
     const type = document.getElementById('typeFilter')?.value || '';
     const documentSource = document.getElementById('documentFilter')?.value || '';
 
-    console.log('Search parameters:', { value, cr, type, document: documentSource });
-
-    const searchResults = await searchMonsters(value, { cr, type, document: documentSource, limit: 50 });
-
-    // Prioritize exact matches
-    const prioritizedResults = prioritizeExactMatches(searchResults.results, value);
-
-    displaySearchResults(prioritizedResults);
-  }, 250);
+    try {
+      const data = await searchMonsters(value, { cr, type, document: documentSource, limit: 50 });
+      displaySearchResults(data.results || []);
+    } catch (error) {
+      resultsContainer.innerHTML = 'Search failed. Please try again.';
+    }
+  }, DEBOUNCE_MS);
 }
 
 // Perform search request to Open5e API
-export async function searchMonsters(query, options = {}) {
-  // Remove empty query
-  // if (!query || query.trim() === '') {
-  //   return { results: [] };
-  // }
-
+async function searchMonsters(query, options = {}) {
   const baseUrl = 'https://api.open5e.com/v1/monsters/';
-  const params = new URLSearchParams({
-    search: query.trim(), // Allow empty query
-    ordering: 'challenge_rating,name',
-  });
+  const cleanQuery = query.trim().toLowerCase();
 
+  // Minimum length check
+  if (cleanQuery.length < 3 && cleanQuery !== '') {
+    console.log('[OpenFetch] Search term too short, waiting for more characters');
+    ui.notifications.warn('Please enter at least 3 characters to search');
+    return { results: [] };
+  }
+
+  const params = new URLSearchParams();
+
+  // Handle empty search - return first page of results
+  if (cleanQuery === '') {
+    params.append('ordering', 'challenge_rating,name');
+    if (options.limit) params.append('limit', options.limit);
+  }
+  // Handle known exact term "priest"
+  else if (cleanQuery === 'priest') {
+    params.append('slug__in', 'priest');
+  }
+  // Handle normal searches with protection for short terms
+  else {
+    // Use exact match for short terms (3 chars)
+    if (cleanQuery.length === 3) {
+      params.append('name__iexact', cleanQuery);
+    }
+    // Use contains for longer terms
+    else {
+      params.append('name__icontains', cleanQuery);
+    }
+  }
+
+  // Add sorting
+  params.append('ordering', 'challenge_rating,name');
+
+  // Add filters
   if (options.limit) params.append('limit', options.limit);
-
   if (options.cr && options.cr !== '') {
     if (options.cr.includes('-')) {
       const [min, max] = options.cr.split('-');
-      params.append('challenge_rating__gte', min);
-      params.append('challenge_rating__lte', max);
+      params.append('cr__gte', min);
+      params.append('cr__lte', max);
     } else {
-      params.append('challenge_rating', options.cr);
+      params.append('cr', options.cr);
     }
   }
-
-  if (options.type && options.type !== '') params.append('type', options.type);
-  if (options.document && options.document !== '') params.append('document__slug', options.document);
+  if (options.type && options.type !== '') {
+    params.append('type__iexact', options.type);
+  }
+  if (options.document && options.document !== '') {
+    params.append('document__slug__in', options.document);
+  }
 
   const url = `${baseUrl}?${params.toString()}`;
-  console.log('Fetching from URL:', url);
+  console.log('[OpenFetch] Starting request:', {
+    originalQuery: query,
+    cleanQuery,
+    searchLength: cleanQuery.length,
+    url
+  });
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' }
+    });
+
     if (!response.ok) {
-      const errorMessage = `HTTP error! status: ${response.status}`;
-      console.error('Error fetching monsters:', errorMessage);
-      ui.notifications.error('Error fetching monsters: ' + errorMessage);
-      return { results: [] };
+      console.error('[OpenFetch] Request error:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: url,
+        query: cleanQuery
+      });
+
+      // If we get a 500 error with a contains search, try exact match
+      if (response.status === 500 && params.has('name__icontains')) {
+        console.log('[OpenFetch] Retrying with exact match');
+        params.delete('name__icontains');
+        params.append('name__iexact', cleanQuery);
+        return searchMonsters(query, options);
+      }
+
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
     const data = await response.json();
-    console.log('API response:', data);
+    console.log('[OpenFetch] Search successful:', {
+      resultsCount: data.results?.length || 0,
+      query: cleanQuery
+    });
     return data;
+
   } catch (error) {
-    console.error('Error fetching monsters:', error);
-    ui.notifications.error('Error fetching monsters: ' + error.message);
+    console.error('[OpenFetch] Request failed:', {
+      error: error.message,
+      query: cleanQuery,
+      url
+    });
+
+    ui.notifications.error('Failed to fetch monsters. Try a more specific search term.');
     return { results: [] };
   }
 }
+
+
 
 // Display search results in the UI and make them selectable
 export function displaySearchResults(results) {
